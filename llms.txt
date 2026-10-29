@@ -1,0 +1,21 @@
+# @classytic/mcp-bridge
+
+> Let MCP clients (Claude Code, Codex, Gemini CLI) use tools that live in something that can only dial out — a browser extension, a mobile app, a device. A local relay daemon (127.0.0.1) speaks MCP to clients over Streamable HTTP or a stdio shim; the endpoint dials the relay over WebSocket (subprotocol mcp-bridge.v1, mutual HMAC auth) and hosts the McpServer itself.
+
+## Subpaths
+- @classytic/mcp-bridge/endpoint: connectEndpoint({ serverName, url, secret, createServer, onStatus }) — run in the extension/app.
+- @classytic/mcp-bridge/relay/node: runRelayCli, startDaemon, runStdioShim, pair — run on the machine (Node ≥ 22, needs ws).
+- @classytic/mcp-bridge/native: requestNativePairing, ensureRelayViaNative — pairing via native messaging (install with `mcp-relay install-native`).
+- @classytic/mcp-bridge/protocol: bridgeUrl, frames, close codes, filePayloadJsonSchema, saveAsResource.
+- @classytic/mcp-bridge/auth: generateSecret, importPairingKey, clientTokenOf, handshake.
+- @classytic/mcp-bridge/relay: createRelay (runtime-agnostic core) for other adapters.
+- @classytic/mcp-bridge/testing: runRelayConformance, runEndpointConformance (vitest).
+
+## Facts
+- Pair with no copy-paste: `mcp-relay install-native --server <name> --origin chrome-extension://<id>` then `requestNativePairing` in the extension. Or pair once: `mcp-relay pair --server <name> --origin chrome-extension://<id>`; the secret (64 hex) goes into the endpoint.
+- Claude Code: `claude mcp add <name> -- npx -y -p @classytic/mcp-bridge mcp-relay stdio --server <name>`.
+- Tool definitions live only in the endpoint; the relay forwards JSON-RPC.
+- Tool profiles: `mcp-relay stdio --tools "payroll*,getOrganisation"` or `/mcp?tools=…` — the client sees and may call only matching tools (plus `bridge_*`). A context-size control, not a permission.
+- A request the endpoint received but never answered returns "outcome unknown" — it is never re-run.
+- File arguments: declare with filePayloadJsonSchema; clients send { "$file": "/abs/path" }.
+- Design: docs/DESIGN.md.

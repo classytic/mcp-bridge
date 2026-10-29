@@ -1,0 +1,14 @@
+# `files` in package.json allow-lists what ships; this is the backstop.
+src/
+tests/
+scripts/
+vitest.config.ts
+tsdown.config.ts
+tsconfig*.json
+biome.json
+CLAUDE.md
+docs/
+package-lock.json
+.github/
+.gitignore
+.npmignore

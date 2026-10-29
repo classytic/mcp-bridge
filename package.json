@@ -1,0 +1,123 @@
+{
+  "name": "@classytic/mcp-bridge",
+  "version": "0.1.0",
+  "description": "Expose a browser extension (or any app that can open a WebSocket) to MCP clients — Claude Code, Codex, Gemini CLI. A local relay speaks MCP over stdio; the extension dials it and serves MCP sessions. Versioned wire contract, origin + token checks, local files, reconnect, conformance suite.",
+  "type": "module",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=22"
+  },
+  "files": [
+    "dist",
+    "skills",
+    "llms.txt",
+    "CHANGELOG.md",
+    "LICENSE",
+    "TRADEMARK.md",
+    "README.md"
+  ],
+  "exports": {
+    "./protocol": {
+      "types": "./dist/protocol/index.d.mts",
+      "import": "./dist/protocol/index.mjs"
+    },
+    "./auth": {
+      "types": "./dist/auth/index.d.mts",
+      "import": "./dist/auth/index.mjs"
+    },
+    "./transport": {
+      "types": "./dist/transport/index.d.mts",
+      "import": "./dist/transport/index.mjs"
+    },
+    "./endpoint": {
+      "types": "./dist/endpoint/index.d.mts",
+      "import": "./dist/endpoint/index.mjs"
+    },
+    "./native": {
+      "types": "./dist/native/index.d.mts",
+      "import": "./dist/native/index.mjs"
+    },
+    "./relay": {
+      "types": "./dist/relay/index.d.mts",
+      "import": "./dist/relay/index.mjs"
+    },
+    "./relay/node": {
+      "types": "./dist/relay/node/index.d.mts",
+      "import": "./dist/relay/node/index.mjs"
+    },
+    "./testing": {
+      "types": "./dist/testing/index.d.mts",
+      "import": "./dist/testing/index.mjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "bin": {
+    "mcp-relay": "./dist/bin/mcp-relay.mjs"
+  },
+  "scripts": {
+    "build": "tsdown",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json",
+    "lint": "biome check src/ tests/",
+    "lint:fix": "biome check --write src/ tests/",
+    "check": "biome ci src/ tests/ --diagnostic-level=error",
+    "check:peers": "node scripts/check-peer-bundle-parity.mjs",
+    "test": "vitest run",
+    "test:unit": "vitest run --project unit",
+    "test:integration": "vitest run --project integration",
+    "test:watch": "vitest",
+    "prepublishOnly": "npm run check && npm run check:peers && npm run typecheck && npm run build && npm test"
+  },
+  "peerDependencies": {
+    "@classytic/primitives": ">=0.35.0",
+    "@modelcontextprotocol/client": ">=2.4.0",
+    "@modelcontextprotocol/server": ">=2.4.0",
+    "ws": ">=8.22.0"
+  },
+  "peerDependenciesMeta": {
+    "@modelcontextprotocol/client": {
+      "optional": true
+    },
+    "@modelcontextprotocol/server": {
+      "optional": true
+    },
+    "ws": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.6.4",
+    "@classytic/primitives": "^0.35.0",
+    "@modelcontextprotocol/client": "^2.4.0",
+    "@modelcontextprotocol/server": "^2.4.0",
+    "@types/node": "^26.6.6",
+    "@types/ws": "^8.18.2",
+    "tsdown": "^0.23.3",
+    "typescript": "~7.0.2",
+    "vitest": "^5.0.5",
+    "ws": "^8.22.0",
+    "zod": "^4.6.7"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/classytic/mcp-bridge.git"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "browser-extension",
+    "chrome-extension",
+    "relay",
+    "websocket",
+    "claude-code",
+    "codex",
+    "gemini-cli",
+    "agents"
+  ],
+  "overrides": {
+    "typescript": "$typescript"
+  }
+}
