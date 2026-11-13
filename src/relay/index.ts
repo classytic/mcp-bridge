@@ -8,8 +8,10 @@ export {
   type Admission,
   type AdmissionLimits,
   createAdmissionGate,
+  type OriginPolicy,
   type RelaySocket,
   roleForOrigin,
+  rolesForOrigin,
 } from "./admission.js";
 export { clientToolsList, type RelayFiles, readCallFiles, saveCallFiles } from "./files.js";
 export {
@@ -25,6 +27,14 @@ export {
   SUBSCRIPTION_ID_META_KEY,
   subscriptionOf,
 } from "./offline.js";
+export {
+  createPairingCodes,
+  type IssuedCode,
+  normalizeCode,
+  type PairingCodeOptions,
+  type PairingCodes,
+  type RedeemResult,
+} from "./pairing-codes.js";
 export {
   createRelay,
   type Relay,

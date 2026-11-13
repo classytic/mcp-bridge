@@ -10,7 +10,7 @@ import {
 } from "../../src/auth/index.js";
 
 const SECRET = "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff";
-const RESOURCE = "/bridge/xero";
+const RESOURCE = "/bridge/acme";
 const b64url = (b: Buffer) => b.toString("base64url");
 
 async function handshake(
@@ -62,12 +62,12 @@ describe("proofs — golden vector against an independent HMAC", () => {
 
   it("canonical bytes are a fixed JSON array", () => {
     expect(new TextDecoder().decode(proofBytes("server", fields))).toBe(
-      '["mcp-bridge.auth",1,"server","kid","inst","sess","cn","sn",1000,11000,"endpoint","/bridge/xero"]',
+      '["mcp-bridge.auth",1,"server","kid","inst","sess","cn","sn",1000,11000,"endpoint","/bridge/acme"]',
     );
     expect(
       new TextDecoder()
         .decode(proofBytes("accept", fields, "cp"))
-        .endsWith(',"/bridge/xero","cp"]'),
+        .endsWith(',"/bridge/acme","cp"]'),
     ).toBe(true);
   });
 

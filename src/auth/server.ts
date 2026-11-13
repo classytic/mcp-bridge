@@ -34,7 +34,9 @@ export type AuthRefusal =
   | "replay"
   | "capacity"
   | "expired"
-  | "bad_proof";
+  | "bad_proof"
+  /** The dialer asked for a role this connection may not take. */
+  | "role_not_allowed";
 
 /** An issued challenge, waiting for its answer. */
 export interface PendingChallenge {
@@ -48,7 +50,11 @@ export interface AuthAuthority {
   /** Frame 1 in, frame 2 out. */
   challenge(
     raw: string,
-    binding: { role: Role; resource: string },
+    /**
+     * What the connection may be: `roles` (the dialer picks one in `auth.hello`),
+     * or a single `role` (as before 0.2). The chosen role is bound into every proof.
+     */
+    binding: { role?: Role; roles?: readonly Role[]; resource: string },
   ): Promise<Result<{ frame: AuthChallenge; pending: PendingChallenge }, AuthRefusal>>;
   /** Frame 3 in, frame 4 out. */
   accept(raw: string, pending: PendingChallenge): Promise<Result<AuthOk, AuthRefusal>>;
@@ -75,6 +81,10 @@ export function createAuthAuthority(opts: {
       const hello = parseAuthFrame(raw, "auth.hello");
       if (!hello || !base64UrlToBytes(hello.clientNonce, NONCE_BYTES)) return err("malformed");
       if (hello.keyId !== opts.key.keyId) return err("unknown_key");
+      const allowed = binding.roles ?? (binding.role ? [binding.role] : []);
+      // No role asked: the only one allowed, else `client` (what a pre-0.2 dialer meant).
+      const role = hello.role ?? (allowed.length === 1 ? allowed[0] : "client");
+      if (!role || !allowed.includes(role)) return err("role_not_allowed");
       const t = now();
       prune(t);
       const replayKey = `${hello.keyId}:${hello.clientNonce}`;
@@ -88,7 +98,7 @@ export function createAuthAuthority(opts: {
         serverNonce: randomBase64Url(NONCE_BYTES),
         issuedAtMs: t,
         expiresAtMs: t + ttlMs,
-        role: binding.role,
+        role,
         resource: binding.resource,
       };
       seen.set(replayKey, fields.expiresAtMs);

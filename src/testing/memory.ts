@@ -6,7 +6,7 @@
 import type { Transport } from "@modelcontextprotocol/server";
 import type { WebSocketLike } from "../endpoint/index.js";
 import { BRIDGE_SUBPROTOCOL, bridgePath, type JsonRpcMessage } from "../protocol/index.js";
-import { type Relay, type RelaySocket, roleForOrigin } from "../relay/index.js";
+import { type Relay, type RelaySocket, rolesForOrigin } from "../relay/index.js";
 
 /**
  * A linked socket pair: `client` is what an endpoint dials (return it from
@@ -62,7 +62,9 @@ export function createMemorySocketPair(): { client: WebSocketLike; server: Relay
 
 /**
  * A `createSocket` for `connectEndpoint` that connects straight into `relay`,
- * as if from `origin` (an allowed origin → endpoint; else refused like a 403).
+ * as if from `origin`: an allowed origin (or `"null"` when allowed) → endpoint;
+ * no origin → a desktop plugin or local process (endpoint or client); anything
+ * else → refused like a 403.
  */
 export function memoryDialer(
   relay: Relay,
@@ -72,12 +74,12 @@ export function memoryDialer(
 ) {
   return (): WebSocketLike => {
     const pair = createMemorySocketPair();
-    const role = roleForOrigin(origin, allowedOrigins);
-    if (!role) {
+    const roles = rolesForOrigin(origin, { allowedOrigins });
+    if (!roles) {
       pair.server.close(4003, "Origin not allowed");
       return pair.client;
     }
-    relay.accept(pair.server, { role, resource: bridgePath(serverName) });
+    relay.accept(pair.server, { roles, resource: bridgePath(serverName) });
     return pair.client;
   };
 }

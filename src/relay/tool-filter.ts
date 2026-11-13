@@ -2,13 +2,13 @@
  * Tool profiles: which of an endpoint's tools one client session sees.
  *
  * A server with many tools costs every client their schemas on every session.
- * A client that only needs some asks for them — `--tools "@payroll,getOrganisation"`
- * (stdio) or `/mcp?tools=@payroll,getOrganisation` (HTTP) — and the relay lists
+ * A client that only needs some asks for them — `--tools "@orders,getAccount"`
+ * (stdio) or `/mcp?tools=@orders,getAccount` (HTTP) — and the relay lists
  * only those and refuses calls to the rest. The relay's own tools (`bridge_*`)
  * are always available.
  *
  * Patterns, comma-separated, `*` matching any run of characters:
- *   `name`    a tool name (`payroll*`)
+ *   `name`    a tool name (`orders*`)
  *   `@group`  every tool in that group — read from the listed tool's
  *             `_meta["classytic.io/group"]` (string or array; arc-ai's
  *             `serveAsMcp` sets it from each tool's `group` annotation)

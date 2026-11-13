@@ -4,7 +4,7 @@
  *
  *   #!/usr/bin/env node
  *   import { runRelayCli } from '@classytic/mcp-bridge/relay/node';
- *   await runRelayCli({ serverName: 'xero', allowedOrigins: ['chrome-extension://<id>'] });
+ *   await runRelayCli({ serverName: 'my-app', allowedOrigins: ['chrome-extension://<id>'] });
  *
  * Commands:
  *   pair    [--origin <o>]... [--file-root <dir>]... [--downloads <dir>] [--port <n>]
@@ -22,7 +22,15 @@ import { clientTokenOf } from "../../auth/index.js";
 import type { RelayLogger } from "../relay.js";
 import { parseToolPatterns } from "../tool-filter.js";
 import { ensureDaemon, probeDaemon, spawnDetached } from "./attach.js";
-import { configPath, DEFAULT_PORT, loadConfig, pair, requireSecret, saveConfig } from "./config.js";
+import {
+  configPath,
+  DEFAULT_PORT,
+  defaultDownloadsDir,
+  loadConfig,
+  pair,
+  requireSecret,
+  saveConfig,
+} from "./config.js";
 import { startDaemon } from "./daemon.js";
 import { nodeFiles } from "./files.js";
 import { runNativeHost } from "./native-host.js";
@@ -90,7 +98,9 @@ function parseArgs(argv: readonly string[]): Args {
 
 const HELP = `mcp-relay — expose an extension's MCP server to MCP clients
 
-  pair    --server <name> [--origin chrome-extension://<id>]... [--file-root <dir>]... [--downloads <dir>] [--port <n>]
+  pair       --server <name> [--origin chrome-extension://<id>]... [--file-root <dir>]... [--downloads <dir>] [--port <n>]
+             (--downloads defaults to your Downloads folder)
+  pair-code  --server <name> [--origin <origin|null>]...   (one-time code for a desktop plugin, mobile app or device)
   stdio   --server <name> [--endpoint <profile label or id>] [--tools <name,pattern*,…>]   (what an MCP client launches)
   daemon  --server <name>     (foreground)
   status  --server <name>
@@ -218,13 +228,62 @@ export async function runRelayCli(opts: RelayCliOptions = {}): Promise<void> {
   // The relay side may run before anything paired (Claude Code launches `stdio`
   // first): make the secret then — native pairing hands the extension the same one.
   const secret =
-    args.command === "stdio" || args.command === "daemon"
+    args.command === "stdio" || args.command === "daemon" || args.command === "pair-code"
       ? (config.secret ?? (await pair(serverName)).secret)
       : requireSecret(serverName, config);
   const port = args.port ?? config.port ?? DEFAULT_PORT;
   const allowedOrigins = [
     ...new Set([...(opts.allowedOrigins ?? []), ...(config.allowedOrigins ?? []), ...args.origins]),
   ];
+
+  if (args.command === "pair-code") {
+    // Origins an endpoint will dial from ("null" for a sandboxed plugin UI); a
+    // plugin runtime with no Origin needs none. Kept in the config for next time.
+    if (args.origins.length) {
+      await saveConfig(serverName, {
+        ...(await loadConfig(serverName)),
+        allowedOrigins: [...new Set([...(config.allowedOrigins ?? []), ...args.origins])],
+      });
+    }
+    const clientToken = await clientTokenOf(secret);
+    const script = process.argv[1] as string;
+    await ensureDaemon({
+      host: "127.0.0.1",
+      port,
+      serverName,
+      clientToken,
+      spawnDaemon: () =>
+        spawnDetached(process.execPath, [
+          script,
+          "daemon",
+          ...(opts.serverName ? [] : ["--server", serverName]),
+          "--port",
+          String(port),
+        ]),
+    });
+    let issued: { code: string; expiresAt: number } | undefined;
+    for (const origin of args.origins.length ? args.origins : [undefined]) {
+      const res = await fetch(`http://127.0.0.1:${port}/pair/code`, {
+        method: "POST",
+        headers: { authorization: `Bearer ${clientToken}`, "content-type": "application/json" },
+        body: JSON.stringify(origin ? { origin } : {}),
+      });
+      if (!res.ok) throw new Error(`The relay refused to issue a code (${res.status}).`);
+      issued = (await res.json()) as { code: string; expiresAt: number };
+    }
+    const minutes = Math.round(((issued?.expiresAt ?? 0) - Date.now()) / 60_000);
+    process.stdout.write(
+      [
+        `Pairing code for "${serverName}":`,
+        "",
+        `    ${issued?.code}`,
+        "",
+        `Type it into the app within ${minutes} minutes. It works once.`,
+        "",
+      ].join("\n"),
+    );
+    return;
+  }
 
   if (args.command === "daemon") {
     const roots = config.fileRoots ?? [];
@@ -235,9 +294,8 @@ export async function runRelayCli(opts: RelayCliOptions = {}): Promise<void> {
       allowedOrigins,
       port,
       logger,
-      ...(roots.length || config.downloadsDir
-        ? { files: nodeFiles({ roots, downloadsDir: config.downloadsDir }) }
-        : {}),
+      // A pairing made before `pair` set a downloads folder still saves files: default it here too.
+      files: nodeFiles({ roots, downloadsDir: config.downloadsDir ?? defaultDownloadsDir() }),
     });
     if (!started.ok) {
       if (started.reason === "port-in-use")

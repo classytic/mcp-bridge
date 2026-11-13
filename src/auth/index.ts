@@ -1,6 +1,7 @@
 /**
  * `@classytic/mcp-bridge/auth` — mutual HMAC authentication between a relay and
- * whatever dials it, over WebCrypto (browser and Node). The secret never
+ * whatever dials it, over WebCrypto where the runtime has it and a built-in
+ * SHA-256 / HMAC where it doesn't (`useCrypto` to supply your own). The secret never
  * crosses the wire; the relay proves itself first; every proof is bound to
  * the connection's role and path, short-lived and single-use.
  */
@@ -14,6 +15,7 @@ export {
   MAX_CLOCK_SKEW_MS,
 } from "./client.js";
 export {
+  type CryptoProvider,
   clientTokenOf,
   generateSecret,
   importPairingKey,
@@ -21,6 +23,7 @@ export {
   type PairingKey,
   randomBase64Url,
   SECRET_PATTERN,
+  useCrypto,
 } from "./crypto.js";
 export {
   AUTH_VERSION,
@@ -40,3 +43,4 @@ export {
   createAuthAuthority,
   type PendingChallenge,
 } from "./server.js";
+export { hmacSha256, sha256 } from "./sha256.js";

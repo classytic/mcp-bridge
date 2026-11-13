@@ -30,7 +30,7 @@ async function host(raw: Buffer, o: Partial<NativeHostOptions> = {}) {
   stdout.on("data", (c: Buffer) => out.push(c));
   stdin.end(raw);
   await runNativeHost({
-    serverName: "xero",
+    serverName: "acme",
     expectedOrigins: [ORIGIN],
     callerOrigin: `${ORIGIN}/`,
     port: 17345,
@@ -80,7 +80,7 @@ describe("native host", () => {
       v: 1,
       ok: true,
       nonce: request.nonce,
-      relayUrl: "ws://127.0.0.1:17345/bridge/xero",
+      relayUrl: "ws://127.0.0.1:17345/bridge/acme",
       secret: SECRET,
     });
   });
@@ -117,15 +117,15 @@ describe("native host", () => {
 
 describe("extension side", () => {
   it("gets the pairing from the real host", async () => {
-    const r = await requestNativePairing({ serverName: "xero", send: viaHost() });
+    const r = await requestNativePairing({ serverName: "acme", send: viaHost() });
     expect(r).toEqual({
       ok: true,
-      value: { relayUrl: "ws://127.0.0.1:17345/bridge/xero", secret: SECRET },
+      value: { relayUrl: "ws://127.0.0.1:17345/bridge/acme", secret: SECRET },
     });
   });
 
   it("asks the host to start the relay", async () => {
-    expect(await ensureRelayViaNative({ serverName: "xero", send: viaHost() })).toEqual({
+    expect(await ensureRelayViaNative({ serverName: "acme", send: viaHost() })).toEqual({
       ok: true,
       value: "spawned",
     });
@@ -133,14 +133,14 @@ describe("extension side", () => {
 
   it("says a missing host is worth retrying, a refusal is not", async () => {
     const missing = await requestNativePairing({
-      serverName: "xero",
+      serverName: "acme",
       send: async () => {
         throw new Error("Specified native messaging host not found.");
       },
     });
     expect(missing).toMatchObject({ ok: false, error: { code: "host_not_found", retry: true } });
     const refused = await requestNativePairing({
-      serverName: "xero",
+      serverName: "acme",
       send: viaHost({ callerOrigin: `chrome-extension://${"c".repeat(32)}/` }),
     });
     expect(refused).toMatchObject({ ok: false, error: { code: "origin_forbidden", retry: false } });
@@ -148,12 +148,12 @@ describe("extension side", () => {
 
   it("rejects a response that doesn't echo the nonce", async () => {
     const r = await requestNativePairing({
-      serverName: "xero",
+      serverName: "acme",
       send: async (_h, m) => ({
         v: 1,
         ok: true,
         nonce: `${m.nonce}x`,
-        relayUrl: "ws://127.0.0.1:1/bridge/xero",
+        relayUrl: "ws://127.0.0.1:1/bridge/acme",
         secret: SECRET,
       }),
     });
@@ -179,27 +179,27 @@ describe("install", () => {
       remove: async (k) => void keys.delete(k),
     };
     const r = await installNativeHost({
-      serverName: "xero",
+      serverName: "acme",
       origins: [ORIGIN],
       platform: "win32",
       registry,
-      command: { node: "node.exe", script: "C:/bin/xero-mcp.mjs" },
+      command: { node: "node.exe", script: "C:/bin/acme-mcp.mjs" },
     });
-    expect(r.hostName).toBe(nativeHostName("xero"));
+    expect(r.hostName).toBe(nativeHostName("acme"));
     const manifest = JSON.parse(await readFile(r.manifests[0] as string, "utf8"));
     expect(manifest).toEqual({
-      name: "com.classytic.mcp_bridge.xero",
-      description: "MCP bridge pairing for xero",
+      name: "com.classytic.mcp_bridge.acme",
+      description: "MCP bridge pairing for acme",
       path: r.launcher,
       type: "stdio",
       allowed_origins: [`${ORIGIN}/`],
     });
     const launcher = await readFile(r.launcher, "utf8");
-    expect(launcher).toContain('"native-host" "--server" "xero" "--expected-origin"');
+    expect(launcher).toContain('"native-host" "--server" "acme" "--expected-origin"');
     expect([...keys.keys()]).toContain(
-      "Software\\Google\\Chrome\\NativeMessagingHosts\\com.classytic.mcp_bridge.xero",
+      "Software\\Google\\Chrome\\NativeMessagingHosts\\com.classytic.mcp_bridge.acme",
     );
-    await uninstallNativeHost({ serverName: "xero", platform: "win32", registry });
+    await uninstallNativeHost({ serverName: "acme", platform: "win32", registry });
     expect(keys.size).toBe(0);
   });
 
@@ -209,7 +209,7 @@ describe("install", () => {
     delete process.env.XDG_CONFIG_HOME;
     try {
       const r = await installNativeHost({
-        serverName: "xero",
+        serverName: "acme",
         origins: [ORIGIN],
         platform: "linux",
         home,
@@ -220,7 +220,7 @@ describe("install", () => {
           ".config",
           "google-chrome",
           "NativeMessagingHosts",
-          "com.classytic.mcp_bridge.xero.json",
+          "com.classytic.mcp_bridge.acme.json",
         ),
       );
       expect(r.launcher.endsWith(".sh")).toBe(true);
@@ -232,7 +232,7 @@ describe("install", () => {
   it("refuses an origin that isn't an extension id", async () => {
     await expect(
       installNativeHost({
-        serverName: "xero",
+        serverName: "acme",
         origins: ["https://evil.example"],
         platform: "linux",
       }),

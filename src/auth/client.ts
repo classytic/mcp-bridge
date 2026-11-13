@@ -59,6 +59,12 @@ export function createAuthClient(opts: {
   role: Role;
   /** The path this dialer connected to; the challenge must name the same one. */
   resource: string;
+  /**
+   * Ask for `role` in `auth.hello`. Needed where the relay cannot tell the role
+   * from the connection (a desktop plugin's socket has no Origin). Default: true
+   * for `endpoint`, false for `client` — so a client still talks to a pre-0.2 relay.
+   */
+  announceRole?: boolean;
   now?: () => number;
   clientNonce?: string;
 }): AuthClient {
@@ -83,7 +89,14 @@ export function createAuthClient(opts: {
     hello() {
       expect("new");
       state = "waiting-challenge";
-      return { type: "auth.hello", v: AUTH_VERSION, keyId: opts.key.keyId, clientNonce };
+      const announce = opts.announceRole ?? opts.role === "endpoint";
+      return {
+        type: "auth.hello",
+        v: AUTH_VERSION,
+        keyId: opts.key.keyId,
+        clientNonce,
+        ...(announce ? { role: opts.role } : {}),
+      };
     },
     async answer(raw) {
       expect("waiting-challenge");

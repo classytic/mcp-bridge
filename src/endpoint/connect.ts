@@ -89,6 +89,13 @@ export interface EndpointOptions {
   endpoint?: EndpointIdentity | (() => EndpointIdentity | Promise<EndpointIdentity>);
   /** `bridgeUrl(port, serverName)`, or several to try in turn. */
   url: string | readonly string[];
+  /**
+   * Name the endpoint role in the handshake. Needed where the relay can't tell
+   * it from the connection — a desktop plugin, app or device sends no Origin.
+   * A browser extension (an allowlisted Origin) may set `false` to keep talking
+   * to a 0.1 relay, which refuses the field. @default true
+   */
+  announceRole?: boolean;
   /** The pairing secret (64 hex), or a function reading it (re-read on every connect). */
   secret: string | (() => string | undefined | Promise<string | undefined>);
   /**
@@ -338,7 +345,12 @@ export function connectEndpoint(opts: EndpointOptions): EndpointHandle {
     ws.onopen = () => {
       if (!current()) return;
       if (ws.protocol !== BRIDGE_SUBPROTOCOL) return ws.close(4426, "Subprotocol not negotiated");
-      auth = createAuthClient({ key, role: "endpoint", resource: pathOf(url) });
+      auth = createAuthClient({
+        key,
+        role: "endpoint",
+        resource: pathOf(url),
+        announceRole: opts.announceRole ?? true,
+      });
       ws.send(JSON.stringify(auth.hello()));
     };
     ws.onmessage = (ev) => {

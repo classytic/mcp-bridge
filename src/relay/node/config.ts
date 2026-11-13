@@ -46,16 +46,20 @@ export async function saveConfig(serverName: string, config: RelayConfig): Promi
 }
 
 /** Make a new pairing secret for `serverName` (keeping the rest of its config) and save it. */
+/** Where saved files go when pairing names no folder: the user's Downloads folder. */
+export const defaultDownloadsDir = (): string => join(homedir(), "Downloads");
+
 export async function pair(
   serverName: string,
   patch: Omit<RelayConfig, "secret"> = {},
 ): Promise<{ secret: string; path: string }> {
   const secret = generateSecret();
-  const path = await saveConfig(serverName, {
-    ...(await loadConfig(serverName)),
-    ...patch,
-    secret,
-  });
+  const current = await loadConfig(serverName);
+  // Without a downloads folder every file a tool hands back is dropped ("this relay
+  // has no downloads folder"), so a fresh pairing gets one; a folder already
+  // configured, or one passed with --downloads, wins.
+  const downloadsDir = patch.downloadsDir ?? current.downloadsDir ?? defaultDownloadsDir();
+  const path = await saveConfig(serverName, { ...current, ...patch, downloadsDir, secret });
   return { secret, path };
 }
 
@@ -63,6 +67,7 @@ export async function pair(
 export function requireSecret(serverName: string, config: RelayConfig): string {
   if (isSecret(config.secret)) return config.secret;
   throw new Error(
-    `"${serverName}" is not paired. Run: mcp-relay pair --server ${serverName} --origin chrome-extension://<id>`,
+    `"${serverName}" is not paired. Run: mcp-relay pair-code --server ${serverName} (a desktop app or device), ` +
+      `or mcp-relay pair --server ${serverName} --origin chrome-extension://<id> (a browser extension)`,
   );
 }

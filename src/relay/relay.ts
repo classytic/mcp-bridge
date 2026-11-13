@@ -58,7 +58,7 @@ export interface RelayLogger {
 }
 
 export interface RelayOptions {
-  /** The server this relay fronts (`xero`). Dialers must name the same one. */
+  /** The server this relay fronts (`my-app`). Dialers must name the same one. */
   serverName: string;
   /** The imported pairing secret. */
   key: PairingKey;

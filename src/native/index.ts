@@ -4,7 +4,7 @@
  * (no copy-paste), or ask it to start the relay.
  *
  * ```ts
- * const r = await requestNativePairing({ serverName: 'xero' });
+ * const r = await requestNativePairing({ serverName: 'my-app' });
  * if (r.ok) await storage.set({ bridgeUrl: r.value.relayUrl, bridgeSecret: r.value.secret });
  * else if (r.error.retry) scheduleRetry(); else showManualPairing(r.error.code);
  * ```

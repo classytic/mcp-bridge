@@ -126,7 +126,7 @@ export function createHttpMcp(opts: { relay: Relay; clientToken: string; logger:
     // `/mcp?endpoint=Acme` pins this client to one browser profile.
     const query = new URL(req.url ?? MCP_PATH, "http://127.0.0.1").searchParams;
     const pinned = query.get("endpoint") ?? undefined;
-    // `/mcp?tools=payroll*,getOrganisation` — this client's tool profile.
+    // `/mcp?tools=orders*,getAccount` — this client's tool profile.
     let tools: string[] | undefined;
     try {
       tools = parseToolPatterns(query.get("tools"));

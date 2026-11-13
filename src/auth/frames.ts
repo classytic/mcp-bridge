@@ -24,6 +24,12 @@ export interface AuthHello {
   v: 1;
   keyId: string;
   clientNonce: string;
+  /**
+   * The role this dialer asks for. Optional: without it the relay uses the only
+   * role the connection may take, or `client` when it may take either. Endpoints
+   * send it — a desktop plugin's socket carries no Origin to tell the relay.
+   */
+  role?: Role;
 }
 
 /** What the relay commits to in a challenge — every field is signed into each proof. */
@@ -36,7 +42,7 @@ export interface ChallengeFields {
   issuedAtMs: number;
   expiresAtMs: number;
   role: Role;
-  /** The exact path the socket connected to (`/bridge/xero`). */
+  /** The exact path the socket connected to (`/bridge/<server>`). */
   resource: string;
 }
 
@@ -59,6 +65,7 @@ export interface AuthOk {
 }
 
 const HELLO_KEYS = ["type", "v", "keyId", "clientNonce"];
+const HELLO_KEYS_WITH_ROLE = [...HELLO_KEYS, "role"];
 const CHALLENGE_KEYS = [
   "type",
   "v",
@@ -97,12 +104,18 @@ export function parseAuthFrame<T extends keyof AuthFrameByType>(
 ): AuthFrameByType[T] | null {
   const value = parseStrictJsonObject(raw, MAX_AUTH_FRAME_BYTES);
   if (!value || value.type !== type || value.v !== AUTH_VERSION) return null;
-  if (!hasExactKeys(value, KEYS[type] as string[])) return null;
+  const keys =
+    type === "auth.hello" && "role" in value ? HELLO_KEYS_WITH_ROLE : (KEYS[type] as string[]);
+  if (!hasExactKeys(value, keys)) return null;
   for (const [k, v] of Object.entries(value)) {
     const numeric = k === "issuedAtMs" || k === "expiresAtMs" || k === "v";
     if (numeric ? !Number.isSafeInteger(v) : typeof v !== "string") return null;
   }
-  if (type === "auth.challenge" && value.role !== "endpoint" && value.role !== "client")
+  if (
+    (type === "auth.challenge" || (type === "auth.hello" && "role" in value)) &&
+    value.role !== "endpoint" &&
+    value.role !== "client"
+  )
     return null;
   return value as unknown as AuthFrameByType[T];
 }

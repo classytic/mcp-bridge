@@ -4,8 +4,8 @@
  *
  * ```ts
  * const bridge = connectEndpoint({
- *   serverName: 'xero',
- *   url: bridgeUrl(17345, 'xero'),
+ *   serverName: 'my-app',
+ *   url: bridgeUrl(17345, 'my-app'),
  *   secret: () => storage.get('bridgeSecret'),
  *   createServer: ({ client }) => buildServer(client),   // McpServer, arc-ai serveAsMcp, …
  *   onStatus: (s) => panelStatus.set(s),
@@ -29,3 +29,9 @@ export {
   type SessionServer,
   type WebSocketLike,
 } from "./connect.js";
+export {
+  type PairedRelay,
+  type PairWithCodeError,
+  type PairWithCodeOptions,
+  pairWithCode,
+} from "./pair.js";

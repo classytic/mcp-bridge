@@ -1,5 +1,40 @@
 # Changelog
 
+## 0.2.0 — 2026-11-13
+
+Endpoints beyond browser extensions — a desktop app's plugin (Adobe UXP, Figma,
+an Office add-in), a mobile app, a device.
+
+### Added
+- **Pairing by code.** `mcp-relay pair-code --server <name> [--origin null]` prints a
+  one-time code (single-use, 5 min, 5 tries, throttled relay-wide); the app redeems it
+  with `pairWithCode` (`./endpoint`) and gets `{ relayUrl, secret }`. The daemon serves
+  `POST /pair/code` (client token, no Origin) and `POST /pair` (any origin; CORS and
+  Private Network Access preflights). `createPairingCodes` (`./relay`) for other adapters.
+- **Endpoints without an Origin.** `auth.hello` may name the dialer's `role`; endpoints
+  always do. A socket with no Origin may be a client or an endpoint (it still proves the
+  secret); `localEndpoints: false` on the daemon keeps it to clients. `rolesForOrigin` /
+  `OriginPolicy` (`./relay`); `AcceptContext.roles`. Origin `"null"` (a sandboxed plugin
+  UI) may be allowlisted.
+- **No-WebCrypto runtimes.** A built-in SHA-256 / HMAC-SHA256 (`sha256`, `hmacSha256`
+  from `./auth`) is used where `crypto.subtle` is missing; `useCrypto({ getRandomValues,
+  hmacSha256, webCrypto })` lets a host supply its own.
+
+### Changed
+- The relay saves files to your `Downloads` folder when none is configured — at `daemon`
+  start too, so earlier pairings are covered without re-pairing; `mcp-relay pair` also
+  writes it into a new pairing's config. Pass `--downloads <dir>` for another folder. (Was: when none is
+  configured, files a tool handed back were dropped with "this relay has no downloads folder".)
+- `roleForOrigin` is deprecated (no-Origin sockets were clients only); adapters use
+  `rolesForOrigin`. `AcceptContext.role` still works.
+
+### Compatibility
+- A client (`stdio` shim) still speaks to a 0.1 relay. An endpoint on this version
+  announces its role, which a 0.1 relay refuses — run the relay from this version too
+  (`npx -p @classytic/mcp-bridge` fetches the latest; a 0.1 daemon still running exits
+  after 10 idle minutes, or `mcp-relay stop`). A browser extension (allowlisted Origin)
+  can pass `connectEndpoint({ announceRole: false })` to work with both.
+
 ## 0.1.0 — 2026-10-29
 
 First version of the `mcp-bridge.v1` contract.

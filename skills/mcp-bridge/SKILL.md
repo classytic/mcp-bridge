@@ -1,6 +1,6 @@
 ---
 name: mcp-bridge
-description: Expose a browser extension's (or app's) tools to MCP clients with @classytic/mcp-bridge — connectEndpoint in the extension, the mcp-relay daemon/stdio shim on the machine, pairing, files, conformance tests. Use when wiring an extension to Claude Code/Codex/Gemini CLI over MCP, adding tools to a bridged endpoint, or writing a relay adapter.
+description: Expose the tools of a browser extension, a desktop app's plugin (Adobe UXP, Figma, Office add-in), a mobile app or a device to MCP clients with @classytic/mcp-bridge — connectEndpoint in the app, the mcp-relay daemon/stdio shim on the machine, pairing (secret, code, native messaging), files, conformance tests. Use when wiring an app that can only dial out to Claude Code/Codex/Gemini CLI over MCP, adding tools to a bridged endpoint, or writing a relay adapter.
 ---
 
 # @classytic/mcp-bridge
@@ -11,6 +11,13 @@ description: Expose a browser extension's (or app's) tools to MCP clients with @
 2. `createServer({ session, client })` returns a fresh `McpServer` (or arc-ai `serveAsMcp`) per session.
    Give every tool `annotations.readOnlyHint` or `destructiveHint`.
 3. Show `onStatus` in the UI (connecting / connected / refused + reason).
+
+## Wire a desktop plugin, mobile app or device
+1. Manifest: allow `ws://127.0.0.1:17345` and `http://127.0.0.1:17345` (UXP `requiredPermissions.network.domains`; Figma `networkAccess`).
+2. User runs `mcp-relay pair-code --server <name>` (add `--origin null` for a sandboxed plugin UI); the app calls
+   `pairWithCode({ serverName, code })` and stores `{ relayUrl, secret }`.
+3. `connectEndpoint({ serverName, url: relayUrl, secret, createServer })` — no Origin needed.
+4. No `crypto.subtle`? It falls back to a built-in HMAC. No `crypto.getRandomValues`? `useCrypto({ getRandomValues })`.
 
 ## Pair and connect a client
 - `mcp-relay pair --server <name> --origin chrome-extension://<id>` → last line is the secret for the extension.

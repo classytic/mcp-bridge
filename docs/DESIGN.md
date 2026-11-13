@@ -33,8 +33,14 @@ Rules that don't move:
 - Subprotocol **`mcp-bridge.v1`**, exactly one offered; the endpoint refuses a
   socket whose negotiated `ws.protocol` differs (openclaw `relay-connection.js`).
 - The relay checks `Host` is loopback (DNS-rebinding guard, hermes
-  `web_server_boundary.py`) and `Origin` is in the allowlist for endpoints, or
-  absent for local clients — never "empty means fine" (openclaw's gap).
+  `web_server_boundary.py`), then narrows the roles a socket may take by its
+  `Origin` — never "empty means fine" (openclaw's gap):
+  - no `Origin` (a local process, a desktop app's plugin runtime) → client or
+    endpoint (endpoint unless the relay sets `localEndpoints: false`);
+  - an allowlisted origin (`chrome-extension://<id>`, a web app, or `null` — a
+    sandboxed iframe such as a plugin UI) → endpoint;
+  - any other origin (a web page the user merely visited) → refused.
+  Every role still proves the secret; the Origin only limits who may try.
 
 ### 2.2 Pre-auth phase (bounded)
 - 16 KiB wire cap until authenticated, 10 s deadline, pending-connection
@@ -51,7 +57,7 @@ enforced by format). `keyId = base64url(SHA-256(key))[0..22]`.
 
 | # | Direction | Frame (exact keys) |
 |---|---|---|
-| 1 | dialer → relay | `auth.hello {v:1, keyId, clientNonce}` |
+| 1 | dialer → relay | `auth.hello {v:1, keyId, clientNonce, role?}` |
 | 2 | relay → dialer | `auth.challenge {v:1, keyId, instanceId, sessionId, clientNonce, serverNonce, issuedAtMs, expiresAtMs, role, resource, serverProof}` |
 | 3 | dialer → relay | `auth.response {v:1, sessionId, clientProof}` |
 | 4 | relay → dialer | `auth.ok {v:1, sessionId, acceptProof}` |
@@ -62,10 +68,18 @@ enforced by format). `keyId = base64url(SHA-256(key))[0..22]`.
   anything (a relay without the key gets no oracle). `acceptProof` confirms the
   relay accepted *this* client proof.
 - `role` (`endpoint` | `client`) and `resource` (the exact path) are bound in,
-  so a proof for one route can't be replayed on another.
+  so a proof for one route can't be replayed on another. The dialer asks for
+  its role in `auth.hello` (endpoints always do — a plugin's socket has no
+  Origin to infer it from); the relay binds it only if the connection may take
+  it, else refuses `role_not_allowed`. Without `role` (a client, or a pre-0.2
+  dialer) it is the connection's only allowed role, else `client`. The app
+  `hello` must then name the role that was proven.
 - Challenge TTL 10 s, clock skew ≤ 30 s; challenge consumed *before* the proof
   is checked; replay map keyed `keyId:clientNonce` until expiry.
-- WebCrypto on both sides; one canonicaliser; **golden test vectors** plus a
+- WebCrypto where the runtime has it, else a built-in SHA-256 / HMAC
+  (`auth/sha256.ts`, checked against WebCrypto and the RFC 4231 vectors) —
+  some plugin hosts lack `crypto.subtle`; `useCrypto` lets a host supply its own
+  random source or HMAC. One canonicaliser; **golden test vectors** plus a
   mutation test per bound field.
 - No legacy/plaintext mode, ever (openclaw's `allowLegacyAuth ?? true` is the
   thing to avoid).
@@ -90,7 +104,7 @@ enforced by format). `keyId = base64url(SHA-256(key))[0..22]`.
 - **Never acked** → redelivered after reconnect.
 - **Acked but unanswered** when the endpoint vanished → the client gets an
   error *"outcome unknown — check before retrying"*, never a silent re-run. A
-  Xero write must not happen twice because a service worker restarted.
+  write (posting a payment) must not happen twice because a service worker restarted.
 - Relay restart changes `epoch`; endpoints reset their watermarks.
 
 ### 2.6 Clients before the endpoint
@@ -125,7 +139,7 @@ folder.
   squatter gap). Spawns the daemon detached; then talks to it as a `client`.
 - `GET /health` (authenticated): protocol, version, endpoint connected,
   sessions — used by the shim and by `mcp-relay status`.
-- Pairing: `mcp-relay pair --server xero` writes the secret to the user config
+- Pairing: `mcp-relay pair --server my-app` writes the secret to the user config
   dir (0600) and prints it plus the ready-made `claude mcp add` / Codex /
   Gemini snippets.
 - **Later (0.2): native messaging host** that hands the extension its pairing
@@ -257,7 +271,25 @@ without forwarding it; the relay's own `bridge_*` tools are always kept. It is
 a context-size control, not a permission: the endpoint's own approvals still
 decide what runs.
 
-## 11. Still open
+## 11. Desktop apps, mobile apps and devices
+
+An endpoint that is a desktop app's plugin (Adobe UXP, Figma, an Office add-in),
+a mobile app or a device can open a WebSocket but has no native messaging, may
+send no `Origin` (or `null`), and may lack WebCrypto. So:
+
+- **Role from the handshake** (§2.1, §2.3) — no Origin needed to be an endpoint.
+- **Pairing by code.** `mcp-relay pair-code --server <name>` asks the running
+  relay (`POST /pair/code`, client token, no Origin — never a page) for a code:
+  8 characters from a 30-symbol alphabet (no 0/O/1/I/L/U), shown `ABCD-EFGH`,
+  single-use, 5 minutes, withdrawn after 5 wrong tries; wrong codes are
+  throttled relay-wide (20 a minute). Only the newest code is live. The plugin
+  redeems it with `pairWithCode` (`POST /pair {server, code}`, any origin, CORS
+  and Private Network Access preflights answered) and gets `{relayUrl, secret}`.
+  `--origin null` also allowlists a sandboxed plugin UI, live and in the config.
+  A pending code keeps an idle relay alive.
+- **Crypto fallback** (§2.3).
+
+## 12. Still open
 
 - **Hosted relay (`wss://`, rotating secrets)** and a **Bun adapter** — later.
 - **WebMCP adapter** — serve a page's `document.modelContext` tools through the

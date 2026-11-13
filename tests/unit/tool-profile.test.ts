@@ -8,11 +8,11 @@ import { parseToolPatterns, Session, toolFilter } from "../../src/relay/index.js
 
 describe("tool patterns", () => {
   it("parses a comma list and matches * wildcards", () => {
-    const allow = toolFilter(parseToolPatterns(" payroll* , getOrganisation ,"));
-    expect(allow?.("payrollLoad")).toBe(true);
-    expect(allow?.("getOrganisation")).toBe(true);
-    expect(allow?.("getOrganisationX")).toBe(false);
-    expect(allow?.("codingReconcile")).toBe(false);
+    const allow = toolFilter(parseToolPatterns(" orders* , getAccount ,"));
+    expect(allow?.("ordersCreate")).toBe(true);
+    expect(allow?.("getAccount")).toBe(true);
+    expect(allow?.("getAccountX")).toBe(false);
+    expect(allow?.("invoicesSend")).toBe(false);
     expect(allow?.("bridge_listEndpoints")).toBe(true);
   });
 
@@ -26,8 +26,8 @@ describe("tool patterns", () => {
   });
 
   it("is carried by the open frame, validated", () => {
-    expect(isFrame({ type: "open", session: "s", tools: ["payroll*"] })).toBe(true);
-    expect(isFrame({ type: "open", session: "s", tools: "payroll*" })).toBe(false);
+    expect(isFrame({ type: "open", session: "s", tools: ["orders*"] })).toBe(true);
+    expect(isFrame({ type: "open", session: "s", tools: "orders*" })).toBe(false);
     expect(isFrame({ type: "open", session: "s", tools: [1] })).toBe(false);
   });
 });
@@ -47,7 +47,7 @@ describe("a session with a tool profile", () => {
         notConnected: "offline",
         endpoint: () => ({ generation: 1, acks: false, send: (f) => frames.push(f) }),
         eras: () => ["modern"],
-        allowTool: toolFilter(["payroll*"]),
+        allowTool: toolFilter(["orders*"]),
         warn: () => {},
       },
     );
@@ -62,8 +62,8 @@ describe("a session with a tool profile", () => {
       id: 1,
       result: {
         tools: [
-          { name: "payrollState", inputSchema: {} },
-          { name: "codingReconcile", inputSchema: {} },
+          { name: "ordersList", inputSchema: {} },
+          { name: "invoicesSend", inputSchema: {} },
         ],
       },
     });
@@ -71,7 +71,7 @@ describe("a session with a tool profile", () => {
       (toClient[0]?.result as { tools: Array<{ name: string }> } | undefined)?.tools.map(
         (t) => t.name,
       ),
-    ).toEqual(["payrollState"]);
+    ).toEqual(["ordersList"]);
   });
 
   it("refuses a call outside the profile without reaching the endpoint", async () => {
@@ -80,7 +80,7 @@ describe("a session with a tool profile", () => {
       jsonrpc: "2.0",
       id: 2,
       method: "tools/call",
-      params: { name: "codingReconcile", arguments: {} },
+      params: { name: "invoicesSend", arguments: {} },
     });
     expect(frames.filter((f) => f.type === "mcp")).toEqual([]);
     expect(toClient[0]).toMatchObject({
@@ -92,7 +92,7 @@ describe("a session with a tool profile", () => {
       jsonrpc: "2.0",
       id: 3,
       method: "tools/call",
-      params: { name: "payrollState", arguments: {} },
+      params: { name: "ordersList", arguments: {} },
     });
     expect(frames.some((f) => f.type === "mcp" && (f.message as { id?: unknown }).id === 3)).toBe(
       true,
@@ -104,17 +104,17 @@ describe("profiles by @group", () => {
   const groupsOf = new Map<string, string[]>();
   const listed = {
     tools: [
-      { name: "payrollState", inputSchema: {}, _meta: { "classytic.io/group": ["payroll"] } },
-      { name: "xeroGuide", inputSchema: {}, _meta: { "classytic.io/group": "ops" } },
-      { name: "codingReconcile", inputSchema: {}, _meta: { "classytic.io/group": ["coding"] } },
+      { name: "ordersList", inputSchema: {}, _meta: { "classytic.io/group": ["orders"] } },
+      { name: "helpGuide", inputSchema: {}, _meta: { "classytic.io/group": "ops" } },
+      { name: "invoicesSend", inputSchema: {}, _meta: { "classytic.io/group": ["invoices"] } },
     ],
   };
 
   it("matches a tool by any of its groups, with wildcards", () => {
-    const allow = toolFilter(["@pay*", "getOrganisation"]);
-    expect(allow?.("payrollState", ["payroll"])).toBe(true);
-    expect(allow?.("codingReconcile", ["coding"])).toBe(false);
-    expect(allow?.("getOrganisation")).toBe(true);
+    const allow = toolFilter(["@ord*", "getAccount"]);
+    expect(allow?.("ordersList", ["orders"])).toBe(true);
+    expect(allow?.("invoicesSend", ["invoices"])).toBe(false);
+    expect(allow?.("getAccount")).toBe(true);
   });
 
   it("lists by group and lets calls through once groups are known", async () => {
@@ -131,7 +131,7 @@ describe("profiles by @group", () => {
         notConnected: "offline",
         endpoint: () => ({ generation: 1, acks: false, send: (f) => frames.push(f) }),
         eras: () => ["modern"],
-        allowTool: toolFilter(["@payroll", "@ops"]),
+        allowTool: toolFilter(["@orders", "@ops"]),
         toolGroups: groupsOf,
         warn: () => {},
       },
@@ -141,7 +141,7 @@ describe("profiles by @group", () => {
       jsonrpc: "2.0",
       id: 1,
       method: "tools/call",
-      params: { name: "payrollState", arguments: {} },
+      params: { name: "ordersList", arguments: {} },
     });
     expect(toClient[0]).toMatchObject({ id: 1, error: { code: -32602 } });
 
@@ -150,13 +150,13 @@ describe("profiles by @group", () => {
     const names = (
       toClient[1]?.result as { tools: Array<{ name: string }> } | undefined
     )?.tools.map((t) => t.name);
-    expect(names).toEqual(["payrollState", "xeroGuide"]);
+    expect(names).toEqual(["ordersList", "helpGuide"]);
 
     await session.fromClient({
       jsonrpc: "2.0",
       id: 3,
       method: "tools/call",
-      params: { name: "payrollState", arguments: {} },
+      params: { name: "ordersList", arguments: {} },
     });
     expect(frames.some((f) => f.type === "mcp" && (f.message as { id?: unknown }).id === 3)).toBe(
       true,
